@@ -83,14 +83,83 @@ export function verifyIpnSignature(rawBody: string, signature: string | null) {
   return timingSafeEqual(a, b);
 }
 
-export function appUrl() {
-  return (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+function isLocalHost(value: string) {
+  return /localhost|127\.0\.0\.1/i.test(value);
 }
 
-export function ipnCallbackUrl() {
-  const base = appUrl();
-  if (/localhost|127\.0\.0\.1/i.test(base)) {
-    return undefined;
+export function appUrl(request?: Request) {
+  const host = (request?.headers.get("x-forwarded-host") || request?.headers.get("host") || "")
+    .split(",")[0]
+    .trim();
+  const protoHeader = (request?.headers.get("x-forwarded-proto") || "").split(",")[0].trim();
+  if (host && !isLocalHost(host)) {
+    const proto = protoHeader === "http" ? "http" : "https";
+    return `${proto}://${host}`.replace(/\/$/, "");
   }
+  const env = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "").trim().replace(/\/$/, "");
+  if (env && !isLocalHost(env)) return env;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
+  return "https://ohioismquant.vip";
+}
+
+export function ipnCallbackUrl(request?: Request) {
+  const base = appUrl(request);
+  if (isLocalHost(base)) return "https://ohioismquant.vip/api/pay/ipn";
   return `${base}/api/pay/ipn`;
+}
+
+type PaymentRow = {
+  order_id?: string;
+  invoice_id?: string | number;
+  payment_id?: string | number;
+  payment_status?: string;
+};
+
+function paymentRows(payload: unknown): PaymentRow[] {
+  if (Array.isArray(payload)) return payload as PaymentRow[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+    return (payload as { data: PaymentRow[] }).data;
+  }
+  return [];
+}
+
+function statusForMatch(rows: PaymentRow[], orderId: string, invoiceId?: string | null) {
+  const matches = rows.filter((row) => {
+    if (String(row.order_id ?? "") === orderId) return true;
+    return Boolean(invoiceId) && String(row.invoice_id ?? "") === String(invoiceId);
+  });
+  const unlocked = matches.find((row) => paymentUnlocksAccess(row.payment_status));
+  const status = unlocked?.payment_status || matches[0]?.payment_status;
+  return status ? String(status).toLowerCase() : null;
+}
+
+export async function paymentStatusForOrder(
+  orderId: string,
+  invoiceId?: string | null,
+  paymentId?: string | null,
+) {
+  const headers = { "x-api-key": apiKey() };
+  if (paymentId) {
+    const res = await fetch(`${API}/payment/${encodeURIComponent(paymentId)}`, { headers, cache: "no-store" });
+    if (res.ok) {
+      const data = (await res.json()) as { payment_status?: string; order_id?: string };
+      if (!data.order_id || String(data.order_id) === orderId) {
+        if (data.payment_status) return String(data.payment_status).toLowerCase();
+      }
+    }
+  }
+  if (invoiceId) {
+    const invoiceQueries = [
+      `${API}/payment/?invoiceid=${encodeURIComponent(invoiceId)}&limit=50`,
+      `${API}/payment/?invoiceId=${encodeURIComponent(invoiceId)}&limit=50`,
+    ];
+    for (const url of invoiceQueries) {
+      const res = await fetch(url, { headers, cache: "no-store" });
+      if (res.status === 401 || res.status === 403) break;
+      if (!res.ok) continue;
+      const status = statusForMatch(paymentRows(await res.json()), orderId, invoiceId);
+      if (status) return status;
+    }
+  }
+  return null;
 }

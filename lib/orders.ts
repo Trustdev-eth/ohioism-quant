@@ -9,6 +9,7 @@ export type Order = {
   plan: "basic" | "pro";
   amountUsd: number;
   nowpaymentsInvoiceId?: string;
+  paymentId?: string;
   invoiceUrl?: string;
   payAddress?: string;
   payAmount?: string;
@@ -43,6 +44,16 @@ export async function createOrder(input: {
 export async function findOrder(orderId: string) {
   const db = await getDb();
   return db.collection("orders").findOne({ orderId });
+}
+
+export async function listOrdersForEmail(email: string, limit = 20) {
+  const db = await getDb();
+  return db
+    .collection("orders")
+    .find({ email: email.trim().toLowerCase() })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .toArray();
 }
 
 export async function updateOrder(orderId: string, patch: Record<string, unknown>) {

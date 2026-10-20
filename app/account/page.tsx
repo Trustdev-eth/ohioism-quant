@@ -14,15 +14,43 @@ export default function AccountPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("paid")) setNote("Payment submitted. Access unlocks when NOWPayments confirms the invoice.");
+    const paid = params.get("paid");
+    if (paid) setNote("Confirming your payment…");
     if (params.get("canceled")) setNote("Checkout was canceled. You can try again anytime.");
-    fetchMe().then((data) => {
+
+    let cancelled = false;
+    async function load(sync: boolean) {
+      if (sync) {
+        const res = await fetch("/api/pay/sync", { method: "POST" });
+        const data = (await res.json()) as { member?: PublicMember; granted?: boolean; error?: string };
+        if (cancelled) return;
+        if (data.member) {
+          setMember(data.member);
+          if (data.granted) setNote("Payment confirmed. Your plan is unlocked.");
+          else if (paid) setNote("Payment submitted. If Pro is not unlocked yet, wait a moment and refresh this page.");
+          return;
+        }
+        if (paid && res.status === 401) {
+          setNote("Payment received. Sign in here so we can unlock your plan.");
+        }
+      }
+      const data = await fetchMe();
+      if (cancelled) return;
       if (data.blocked) {
         window.location.href = "/blocked";
         return;
       }
       setMember(data.member);
-    }).catch(() => setError("Could not load account."));
+    }
+
+    load(true).catch(() => setError("Could not load account."));
+    const timers = paid
+      ? [3000, 8000, 15000].map((ms) => window.setTimeout(() => void load(true), ms))
+      : [];
+    return () => {
+      cancelled = true;
+      timers.forEach((id) => window.clearTimeout(id));
+    };
   }, []);
 
   async function pay(plan: "basic" | "pro") {

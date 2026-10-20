@@ -12,6 +12,7 @@ export async function POST(request: Request) {
 
   const payload = JSON.parse(raw) as {
     order_id?: string;
+    payment_id?: string | number;
     payment_status?: string;
     invoice_id?: string | number;
     pay_address?: string;
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     payAddress: payload.pay_address,
     payAmount: payload.pay_amount != null ? String(payload.pay_amount) : undefined,
     payCurrency: payload.pay_currency,
+    paymentId: payload.payment_id != null ? String(payload.payment_id) : undefined,
     nowpaymentsInvoiceId: payload.invoice_id != null ? String(payload.invoice_id) : order.nowpaymentsInvoiceId,
   });
 

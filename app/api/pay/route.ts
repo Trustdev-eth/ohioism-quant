@@ -24,15 +24,21 @@ export async function POST(request: Request) {
   }
 
   const orderId = `oq_${randomUUID()}`;
-  const base = appUrl();
-  const invoice = await createNowpaymentsInvoice({
-    priceAmount: amountUsd,
-    orderId,
-    orderDescription: `OhioismQuant ${target} — ${member.email}`,
-    successUrl: `${base}/account?paid=1`,
-    cancelUrl: `${base}/account?canceled=1`,
-    ipnCallbackUrl: ipnCallbackUrl() || `${base}/api/pay/ipn`,
-  });
+  const base = appUrl(request);
+  let invoice;
+  try {
+    invoice = await createNowpaymentsInvoice({
+      priceAmount: amountUsd,
+      orderId,
+      orderDescription: `OhioismQuant ${target} — ${member.email}`,
+      successUrl: `${base}/account?paid=1&order=${orderId}`,
+      cancelUrl: `${base}/account?canceled=1`,
+      ipnCallbackUrl: ipnCallbackUrl(request),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "NOWPayments invoice failed";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   await createOrder({
     orderId,
