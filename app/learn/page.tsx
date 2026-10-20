@@ -141,7 +141,22 @@ export default function LearnPage() {
                 allowFullScreen
               />
             ) : payload?.playback.kind === "media" ? (
-              <video controls playsInline src={payload.playback.mediaPath} />
+              <video
+                controls
+                playsInline
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                onContextMenu={(event) => event.preventDefault()}
+                src={payload.playback.mediaPath}
+                onError={() => {
+                  fetch("/api/auth/me")
+                    .then((res) => res.json())
+                    .then((data: { blocked?: boolean }) => {
+                      if (data.blocked) window.location.href = "/blocked";
+                    })
+                    .catch(() => undefined);
+                }}
+              />
             ) : (
               <div className="player-locked">
                 <div>

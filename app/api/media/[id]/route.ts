@@ -4,25 +4,25 @@ import { blockMember } from "@/lib/members";
 import { canWatchLesson, getLesson, getVideo } from "@/lib/lessons";
 import { isAdmin } from "@/lib/plans";
 import { classifyPlayback } from "@/lib/playback";
-import { emptyDownloadResponse, isBrowserVideoFetch, isDownloaderUserAgent } from "@/lib/security";
+import { emptyDownloadResponse, isBrowserVideoFetch, isDownloadAttempt } from "@/lib/security";
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
+async function gate(request: Request, id: string, mode: "GET" | "HEAD") {
   const lesson = getLesson(id);
   if (!lesson) return emptyDownloadResponse();
 
-  const ua = request.headers.get("user-agent");
   const member = await getSession();
   if (!member || member.blocked) return emptyDownloadResponse();
   if (!canWatchLesson(member.plan, lesson.number)) return emptyDownloadResponse();
 
-  if (isDownloaderUserAgent(ua) && !isAdmin(member.plan)) {
+  if (!isAdmin(member.plan) && isDownloadAttempt(request)) {
+    if (mode === "HEAD") return emptyDownloadResponse();
     await blockMember(member.email, "downloader");
     return NextResponse.redirect(new URL("/blocked", request.url));
   }
 
-  if (!isBrowserVideoFetch(request) && !isAdmin(member.plan)) {
-    return emptyDownloadResponse();
+  if (mode === "GET" && !isBrowserVideoFetch(request) && !isAdmin(member.plan)) {
+    await blockMember(member.email, "downloader");
+    return NextResponse.redirect(new URL("/blocked", request.url));
   }
 
   const granted = await readPlayGrant();
@@ -33,9 +33,31 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const video = await getVideo(lesson.id);
   const playback = classifyPlayback(video?.url);
   if (playback.kind !== "media" || !playback.sourceUrl) return emptyDownloadResponse();
+  return { lesson, playback, member };
+}
+
+export async function HEAD(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const gated = await gate(request, id, "HEAD");
+  if (gated instanceof Response) return gated;
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "Content-Type": "video/mp4",
+      "Cache-Control": "no-store, private",
+      "Content-Disposition": "inline",
+      "Accept-Ranges": "bytes",
+    },
+  });
+}
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const gated = await gate(request, id, "GET");
+  if (gated instanceof Response) return gated;
 
   const range = request.headers.get("range") ?? undefined;
-  const upstream = await fetch(playback.sourceUrl, {
+  const upstream = await fetch(gated.playback.sourceUrl!, {
     headers: range ? { Range: range } : undefined,
     cache: "no-store",
   });

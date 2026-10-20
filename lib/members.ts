@@ -92,12 +92,15 @@ export async function setMemberPlan(email: string, plan: Plan): Promise<Member |
   return findMemberByEmail(email);
 }
 
-export async function blockMember(email: string, reason: string): Promise<void> {
+export async function blockMember(email: string, reason: string): Promise<boolean> {
+  const current = await findMemberByEmail(email);
+  if (!current || current.plan === "admin") return false;
   const db = await getDb();
   await db.collection("members").updateOne(
     { email: normalizeEmail(email) },
     { $set: { blocked: true, blockedAt: new Date(), blockedReason: reason } },
   );
+  return true;
 }
 
 export async function unblockMember(email: string): Promise<void> {
