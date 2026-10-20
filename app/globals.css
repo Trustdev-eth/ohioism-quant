@@ -25,10 +25,11 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}.button:hover{transform:none}}
 .package-select [data-slot=select-value]{min-width:0;overflow:hidden;text-overflow:ellipsis}.hero-copy,.hero-feature,.price-card,.curriculum-intro,.faq-section>div{min-width:0}
 @media(max-width:350px){.header-actions>.button{padding-inline:8px}.brand{font-size:.94rem;gap:6px}.brand-logo{width:30px;height:30px}.hero h1{font-size:3rem}.hero-eyebrow{font-size:.75rem}.enroll-copy h2{font-size:2.2rem}.course-window-body{padding-inline:14px}}
-.hero{align-items:center;grid-template-columns:1fr 1.18fr;gap:48px;padding-block:64px 28px}
-.hero-feature{min-height:580px}
-.program-preview-frame{overflow:hidden}
-.program-preview-video{width:100%;height:580px;display:block;object-fit:cover;background:#000}
+.hero.container{width:min(1360px,calc(100% - 48px))}
+.hero{align-items:center;grid-template-columns:minmax(280px,.72fr) minmax(0,1.7fr);gap:36px;padding-block:48px 24px}
+.hero-feature{min-height:0;width:100%}
+.program-preview-frame{overflow:hidden;width:100%}
+.program-preview-video{width:100%;height:auto;max-height:360px;display:block;object-fit:contain;background:#000;aspect-ratio:16/9}
 .enroll-pay-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
 .enroll-pay-actions .button{min-width:160px;justify-content:center}
 .quote-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -39,4 +40,4 @@
 .auth-form label{font-size:.875rem;font-weight:500;margin-top:8px}
 .auth-form input{width:100%;min-height:46px;border:1px solid var(--input);border-radius:6px;padding:10px 13px;background:var(--background);color:var(--foreground);font-size:.875rem}
 .form-error{color:#d35a5a;font-size:.875rem;margin:0}
-@media(max-width:980px){.hero{grid-template-columns:1fr;gap:28px}.hero-feature{min-height:420px}.program-preview-video{height:420px}.quote-grid{grid-template-columns:1fr}}
+@media(max-width:980px){.hero{grid-template-columns:1fr;gap:28px}.hero-feature{min-height:0}.program-preview-video{max-height:240px;height:auto}.quote-grid{grid-template-columns:1fr}}
